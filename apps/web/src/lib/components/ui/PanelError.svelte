@@ -22,8 +22,8 @@
 	<div class="min-w-0">
 		<p class="text-error text-sm">{message}</p>
 		{#if detail}
-			<p class="text-base-content/60 truncate text-xs">{detail}</p>
+			<p class="text-muted truncate text-xs">{detail}</p>
 		{/if}
 	</div>
-	<button class="btn btn-xs shrink-0" onclick={retry}>Retry</button>
+	<button class="btn btn-ghost btn-xs shrink-0" onclick={retry}>Retry</button>
 </div>

@@ -35,10 +35,17 @@ export const tooManyRequests = (
 	retryAfter?: number | string
 ) => new HttpError(429, code, message, undefined, retryAfter);
 export const internal = (message: string, code = 'INTERNAL') => new HttpError(500, code, message);
+
+const UPSTREAM_RETRY_AFTER_SECONDS = 5;
+
+/**
+ * The default Retry-After marks this error transient, so onError returns `message` to the client
+ * and logs at warn. The message must be safe to expose: no URLs, hostnames or upstream bodies.
+ */
 export const serviceUnavailable = (
 	message: string,
 	code = 'SERVICE_UNAVAILABLE',
-	retryAfter?: number | string
+	retryAfter: number | string = UPSTREAM_RETRY_AFTER_SECONDS
 ) => new HttpError(503, code, message, undefined, retryAfter);
 
 export function isUniqueViolation(err: unknown): boolean {
@@ -55,4 +62,17 @@ export function fromAuthApiError(err: unknown, fallback: string): HttpError {
 		return new HttpError(err.statusCode, 'AUTH_API_ERROR', err.body?.message || fallback);
 	}
 	throw err;
+}
+
+export async function withUniqueViolation<T>(
+	message: string,
+	code: string,
+	fn: () => Promise<T>
+): Promise<T> {
+	try {
+		return await fn();
+	} catch (err) {
+		if (isUniqueViolation(err)) throw conflict(message, code);
+		throw err;
+	}
 }

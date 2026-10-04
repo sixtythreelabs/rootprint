@@ -1,5 +1,6 @@
 <script lang="ts">
-	import { Copy, Minus, Plus } from 'lucide-svelte';
+	import { Minus, Plus } from 'lucide-svelte';
+	import CopyButton from './CopyButton.svelte';
 	import type { FieldRowData } from '$lib/types';
 
 	let {
@@ -7,24 +8,21 @@
 		keyClass = 'w-[min(38%,14rem)]',
 		onFilterFor,
 		onFilterOut,
-		onCopy
+		copyable = false
 	}: {
 		field: FieldRowData;
 		keyClass?: string;
 		onFilterFor?: (field: FieldRowData) => void;
 		onFilterOut?: (field: FieldRowData) => void;
-		onCopy?: (field: FieldRowData) => void;
+		copyable?: boolean;
 	} = $props();
 
-	const hasActions = $derived(Boolean(onFilterFor || onFilterOut || onCopy));
+	const hasActions = $derived(Boolean(onFilterFor || onFilterOut || copyable));
 </script>
 
 <tr class="group border-line border-b align-top last:border-b-0">
 	<td
-		class={[
-			'border-line text-base-content/70 truncate border-r px-3 py-1.5 font-mono text-xs',
-			keyClass
-		]}
+		class={['border-line text-muted truncate border-r px-3 py-1.5 font-mono text-xs', keyClass]}
 		title={field.name}
 	>
 		{field.displayName}
@@ -36,7 +34,7 @@
 		]}
 	>
 		{#if field.isEmpty}
-			<span class="text-base-content/30">—</span>
+			<span class="text-subtle">—</span>
 		{:else}
 			<span class="break-words whitespace-pre-wrap">{field.value}</span>
 			{#if hasActions}
@@ -46,7 +44,7 @@
 					{#if onFilterFor}
 						<button
 							type="button"
-							class="btn btn-xs btn-square join-item"
+							class="btn btn-ghost btn-xs btn-square join-item"
 							aria-label="Filter for value"
 							title="Filter for value"
 							onclick={(e) => {
@@ -54,13 +52,13 @@
 								e.currentTarget.blur();
 							}}
 						>
-							<Plus class="h-3 w-3" />
+							<Plus class="size-3" aria-hidden="true" />
 						</button>
 					{/if}
 					{#if onFilterOut}
 						<button
 							type="button"
-							class="btn btn-xs btn-square join-item"
+							class="btn btn-ghost btn-xs btn-square join-item"
 							aria-label="Filter out value"
 							title="Filter out value"
 							onclick={(e) => {
@@ -68,22 +66,16 @@
 								e.currentTarget.blur();
 							}}
 						>
-							<Minus class="h-3 w-3" />
+							<Minus class="size-3" aria-hidden="true" />
 						</button>
 					{/if}
-					{#if onCopy}
-						<button
-							type="button"
-							class="btn btn-xs btn-square join-item"
+					{#if copyable}
+						<CopyButton
+							text={field.value}
+							class="btn btn-ghost btn-xs btn-square join-item"
 							aria-label="Copy value"
 							title="Copy value"
-							onclick={(e) => {
-								onCopy?.(field);
-								e.currentTarget.blur();
-							}}
-						>
-							<Copy class="h-3 w-3" />
-						</button>
+						/>
 					{/if}
 				</span>
 			{/if}

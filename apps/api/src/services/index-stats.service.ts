@@ -1,13 +1,15 @@
 import { and, asc, eq, gte, lt, sql } from 'drizzle-orm';
-import { QuickwitError, type QuickwitClient } from 'quickwit-js';
+import { QuickwitError, type QuickwitClient } from '@rootprint-io/quickwit-js';
 
 import { config } from '../config.js';
 import type { Db } from '../lib/db.js';
 import { indexStatsSnapshot } from '../db/schema.js';
 import { logger } from '../lib/logger.js';
-import type { IndexStatsPoint, LatestIndexSnapshot } from '../types.js';
+import type { IndexStatsPoint } from '../schemas/responses/indexes.js';
 import { listIndexes } from './quickwit-index.service.js';
 import { pruneSearchAudit } from './search-audit.service.js';
+
+export type LatestIndexSnapshot = IndexStatsPoint & { indexId: string };
 
 const INDEX_STATS_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
 const INDEX_STATS_CONCURRENCY = 8;

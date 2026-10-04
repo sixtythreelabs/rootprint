@@ -15,7 +15,7 @@ For repo-wide rules (Bun, Prettier, TS strict, tests policy), see the root `AGEN
 - ORM: Drizzle + `pg` (PostgreSQL)
 - Auth: Better Auth
 - Validation: Valibot
-- Quickwit client: `quickwit-js`
+- Quickwit client: `@rootprint-io/quickwit-js`
 - Protobuf codegen: buf + `@bufbuild/protoc-gen-es`
 
 ## Run, Build, Check
@@ -32,22 +32,22 @@ Root convenience: `bun run dev:api`, `bun run build:api`, `bun run start:api`.
 
 ## Source Layout
 
-| Path               | Purpose                                                                                                                                                                                                                                                 |
-| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `src/app.ts`       | Hono app composition, middleware mount, error handler, SPA static serving, boot (`main()`)                                                                                                                                                              |
-| `src/config.ts`    | Resolved runtime config object                                                                                                                                                                                                                          |
-| `src/env.ts`       | Hono context types: `AppEnv` (`requestId`, `session?`, `apiKey?`), `AuthedEnv`, `KeyedEnv`                                                                                                                                                              |
-| `src/types.ts`     | Public, pure-type surface re-exported via `exports['./types']`                                                                                                                                                                                          |
-| `src/index.ts`     | Workspace package entry                                                                                                                                                                                                                                 |
-| `src/routes/`      | One file per resource (`api-keys`, `auth`, `exports`, `health`, `indexes`, `monitoring`, `service-accounts`, `settings`, `shares`, `traces`, `users`, `views`); `routes/admin/` (`activity`, `cluster`, `metrics`); `routes/ingest/` (`ndjson`, `otlp`) |
-| `src/services/`    | `*.service.ts` — business logic called from routes                                                                                                                                                                                                      |
-| `src/middleware/`  | `request-context`, `require-user`, `require-admin`, `require-api-key`, `require-user-or-personal-key`, `with-index-config`, `with-index-meta`                                                                                                           |
-| `src/schemas/`     | Valibot request schemas per resource; response schemas under `schemas/responses/`                                                                                                                                                                       |
-| `src/db/`          | Drizzle schemas (`schema.ts`, `auth.schema.ts`) and DB client (`index.ts`)                                                                                                                                                                              |
-| `src/lib/`         | Cross-cutting clients and IO: `auth`, `db`, `quickwit`, `quickwit-proxy`, `quickwit-metrics`, `secret`, `openapi/`, `query/`                                                                                                                            |
-| `src/utils/`       | Pure helpers: `http-error`, `quickwit-error`, `otlp-response`, `bearer`, `params`, `valibot`, `require-env`, `db`                                                                                                                                       |
-| `src/gen/`         | Generated protobuf code — **do not edit**                                                                                                                                                                                                               |
-| `src/constants.ts` | Domain constants                                                                                                                                                                                                                                        |
+| Path               | Purpose                                                                                                                                                                                                                                                                                                                                                                       |
+| ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/app.ts`       | Hono app composition, middleware mount, error handler, SPA static serving, boot (`main()`)                                                                                                                                                                                                                                                                                    |
+| `src/config.ts`    | Resolved runtime config object                                                                                                                                                                                                                                                                                                                                                |
+| `src/env.ts`       | Hono context types: `AppEnv` (`requestId`, `session?`, `apiKey?`, `apiKeyActor?`), `AuthedEnv`, `KeyedEnv`                                                                                                                                                                                                                                                                    |
+| `src/types.ts`     | Types `apps/web` imports, exported as `api/types` (see [Types Contract](#types-contract))                                                                                                                                                                                                                                                                                     |
+| `src/index.ts`     | Package entry: exports `AppType` for the web's Hono RPC client                                                                                                                                                                                                                                                                                                                |
+| `src/routes/`      | One file per resource (`api-keys`, `auth`, `exports`, `health`, `indexes`, `service-accounts`, `services`, `settings`, `shares`, `traces`, `users`, `views`); `routes/admin/` (`activity`, `cluster`, `metrics`); `routes/ingest/` (`ndjson`, `otlp`)                                                                                                                         |
+| `src/services/`    | `*.service.ts` — business logic called from routes                                                                                                                                                                                                                                                                                                                            |
+| `src/middleware/`  | `rate-limit`, `reject-trace-index`, `request-logging`, `require-admin`, `require-api-key`, `require-user`, `require-user-or-personal-key`, `with-index`                                                                                                                                                                                                                       |
+| `src/schemas/`     | Valibot request schemas per resource; response schemas under `schemas/responses/`. Each file also exports the server-only and request-input types inferred from its schemas                                                                                                                                                                                                   |
+| `src/db/`          | Drizzle schemas (`schema.ts`, `auth.schema.ts`); the client is `src/lib/db.ts`                                                                                                                                                                                                                                                                                                |
+| `src/lib/`         | One module or folder per external system, whether or not it does IO: `auth` (Better Auth), `db` (Postgres client, migrations), `quickwit/` (`client`, `proxy`, `query`, `aggregations`, `errors`, `field-caps`, `metrics`, `index-config`), `openapi/`; plus `logger` (pino) and `secret` (Better Auth signing secret)                                                        |
+| `src/utils/`       | Helpers not built around one external system: `bearer`, `http-error`, `otlp-response`, `params`, `require-env`, `valibot`. Two carry system knowledge because the error handler needs it everywhere: `http-error` maps Postgres unique violations and Better Auth API errors to `HttpError`, and `otlp-response` renders ingest results and `HttpError` as OTLP protobuf/JSON |
+| `src/gen/`         | Generated protobuf code — **do not edit**                                                                                                                                                                                                                                                                                                                                     |
+| `src/constants.ts` | Domain constants                                                                                                                                                                                                                                                                                                                                                              |
 
 Sibling top-level dirs:
 
@@ -59,14 +59,15 @@ Sibling top-level dirs:
 
 ## Types Contract
 
-- Public, cross-workspace types go in `src/types.ts` and are exported via `exports['./types']` in `package.json`. Consumers import as `import type { LogHit } from 'api/types'`.
+- `src/types.ts` holds the types `apps/web` imports, exported via `exports['./types']` in `package.json`. Consumers import as `import type { IndexSummary } from 'api/types'`; server code imports those same types from `src/types.ts`. Request-input types inferred from request schemas (`CreateIndexInput`, `CreateUserInput`, …) are the exception: the web imports them from `api/schemas`.
 - `src/types.ts` is pure types only — no runtime exports.
-- Internal helper types live alongside the code that uses them. Move a type to `src/types.ts` only when more than one workspace needs it.
+- A server-only type lives where it is produced. A type inferred from a Valibot schema is exported from that schema's file (`export type X = v.InferOutput<typeof XSchema>`); a hand-written type is exported from the module that builds the value (`VerifiedApiKey` in `services/api-key.service.ts`, `PromMetric` in `lib/quickwit/metrics.ts`). Move a type into `src/types.ts` only when `apps/web` needs it.
+- The web also imports `api` (`AppType`), `api/schemas` (`src/schemas/index.ts`), `api/constants` (`src/constants.ts`) and `api/query` (`src/lib/quickwit/query.ts`). The last three are bundled into the browser build, so nothing they import at runtime may reach server-only modules (`config`, `lib/db`, `lib/quickwit/client`, …).
 
 ## Routing & Request Handling
 
 - Each resource gets a `Hono` router and is mounted with `app.route('/path', router)` in `src/app.ts`.
-- Session-protected routers wrap via the `withAuth()` helper, which mounts `requireUser`; admin routers additionally mount `requireAdmin` themselves. Ingest routes use `requireIngestKey` from `require-api-key`.
+- Session-only routers (`admin/*`, `users`, `service-accounts`, `api-keys`, `shares`, `settings`) are wrapped in `withAuth()` in `app.ts`, which mounts `requireUser`; admin routers additionally mount `requireAdmin` themselves. Routers that mix session-only and bearer-key routes (`indexes`, `views`, `exports`, `traces`, `services`) mount `requireUser` or `requireUserOrPersonalKey` themselves, per router or per route. Ingest routes use `requireIngestKey` from `require-api-key`.
 - Read context values via `c.get('requestId' | 'session' | 'apiKey')`. The env types (`AppEnv`, `AuthedEnv`, `KeyedEnv`) live in `src/env.ts`.
 
 ## Error Handling
@@ -79,7 +80,7 @@ Sibling top-level dirs:
 
 ## Validation
 
-- Use Valibot for all external input (request bodies, query params, headers). The `app.onError` handler maps `ValiError` to a 400 with a structured detail list.
+- Use Valibot for all external input (request bodies, query params, headers). Routes validate through the `validator` wrapper in `lib/openapi/describe.ts`, which throws `HttpError(400, 'VALIDATION_FAILED')` with one `details` entry per issue.
 - Infer TS types from Valibot schemas where possible (`v.InferOutput<typeof Schema>`).
 - Request schemas live in `src/schemas/<resource>.ts` (shared path-param schemas in `src/utils/params.ts`); response schemas in `src/schemas/responses/<resource>.ts`. Route files never define schemas inline — they import them.
 
@@ -108,10 +109,10 @@ Sibling top-level dirs:
 
 - Better Auth setup lives in `src/lib/auth.ts`. Database tables follow Better Auth's schema (`src/db/auth.schema.ts`).
 - Session-based auth (cookies) for the web app; ingest API keys for log producers (`requireIngestKey` in `src/middleware/require-api-key.ts`).
-- Read endpoints additionally accept a personal or service-account bearer key via `requireUserOrPersonalKey` (`src/middleware/require-user-or-personal-key.ts`), falling back to the session cookie when no bearer is present.
+- Log and trace reads (index list, index fields and config, log search, histogram, field values, `/api/traces`, `/api/services`) additionally accept a personal or service-account bearer key via `requireUserOrPersonalKey` (`src/middleware/require-user-or-personal-key.ts`), falling back to the session cookie when no bearer is present. Export, saved views and index preferences are session-only.
 - Google, GitHub, and one generic OpenID Connect provider are configured at runtime via the admin settings UI (writes to `app_settings`). Provider env vars (`GOOGLE_CLIENT_ID` etc.) are **not** read. Better Auth is rebuilt with `reloadAuth()` after credential and password-toggle writes only; allow-list writes are read from the DB at each OAuth sign-in and do not reload.
 - Google sign-in is gated by a domain allowlist; GitHub sign-in by an org allowlist. Both live in `app_settings` and are enforced in `user.validateUserInfo` (`lib/auth.ts`), which Better Auth runs on every OAuth create, link, and repeat sign-in before any row is written. The GitHub verdict is computed in a `getUserInfo` wrapper (the hook never sees the access token) and carried on the profile as `orgAllowed`. If creds are present but the allowlist is empty or missing, all sign-ins for that provider are rejected and the providers endpoint reports it disabled. Nothing re-checks a provider during a session: a removed domain or org takes effect at the user's next sign-in. OIDC has no app-side allowlist: the IdP decides who may sign in. The IdP must echo the nonce and support PKCE (both required by the plugin config), and ID token signatures are verified against the discovered JWKS (`requireIdTokenVerification`). `oidc` is a trusted provider like Google and GitHub (see the comment in `lib/auth.ts`). OIDC `accountId` is `<issuerUrl>|<sub>`.
-- The issuer URL must be `https:` (or loopback `http:`) — the token endpoint carries the client secret. Discovery is fetched on save and again at each Better Auth build. The build probes the issuer with the same 5 s check and omits the provider when it fails (`loadReachableAuthConfig` in `lib/auth.ts`); a retry runs a minute later, so an unreachable issuer leaves OIDC off rather than stalling the auth path.
+- The issuer URL must be `https:`, or `http:` on a private network (`isHttpsOrPrivate` in `schemas/settings.ts`) — the token endpoint carries the client secret. The discovered endpoints must pass the same check, and an `https:` issuer may not downgrade any of them to `http:`. Discovery is fetched on save and again at each Better Auth build. The build probes the issuer with the same 5 s check and omits the provider when it fails (`loadReachableAuthConfig` in `lib/auth.ts`); a retry runs a minute later, so an unreachable issuer leaves OIDC off rather than stalling the auth path.
 - `password_sign_in_disabled` closes `/sign-in/email` via `disabledPaths`. Nothing checks that an external provider is configured or working first — an admin can lock themselves out. Break-glass: delete that row, then restart the API or re-save provider credentials so `disabledPaths` is rebuilt; if the admin has no credential row, insert an `invite_token` row and open `/auth/setup?token=…`.
 - Linking a provider (`google`, `github`, `oidc`) to a user deletes any pending invite and nothing else; any credential row survives, so a password user keeps their password. Account linking is auto-enabled for configured providers with `requireLocalEmailVerified: false`, so an invited user who has not set a password can complete onboarding through a provider.
 - Deleting a provider's credentials revokes the sessions of every user with an account row for that provider, in the same transaction. Deleting OIDC credentials, or saving them with a different issuer URL or client ID, also deletes the `oidc` account rows; users re-link by email at their next sign-in or get a password from an admin reset. Personal API keys are untouched. An OAuth callback already in progress may still complete.
@@ -121,9 +122,9 @@ Sibling top-level dirs:
 
 ## Traces
 
-- Spans live in one Quickwit index, the span store, named by `config.traceIndexId` (env `TRACE_INDEX_ID`). The default `otel-traces-v0_9` tracks the **Quickwit** version — a 0.8 cluster needs `otel-traces-v0_7`. A wrong value fails silently: `getTrace` treats a missing index as an empty trace so a logs-only cluster doesn't error, which means a typo looks like "no spans" rather than a misconfiguration.
-- There is **no raw span search and no trace list**. `GET /api/traces/:traceId` retrieves one trace, while `GET /api/monitoring/services` returns aggregate service-health data from server spans. A trace is reached from a log carrying its id, or by pasting the id into the log search box. Raw span search was cut deliberately — it duplicated the log explorer's shell without its field panel, saved views, or shares. When it returns it belongs in the explore page as a trace-aware index, not as a second explorer.
-- It is a raw `trace_id:<hex>` search with **no time range**, not Quickwit's Jaeger API — that API forced a `now - lookback_period_hours` window (72h default), making older traces findable but unopenable. Capped at `MAX_TRACE_SPANS`; past the cap the kept spans are an arbitrary subset (the query is unsorted, the client orders the waterfall) and `truncated` is set.
+- Spans live in one Quickwit index, the span store, named by `config.traceIndexId` (env `TRACE_INDEX_ID`). The default `otel-traces-v0_9` tracks the **Quickwit** version. A wrong value fails silently: `getTrace` treats a missing index as an empty trace so a logs-only cluster doesn't error, which means a typo looks like "no spans" rather than a misconfiguration.
+- The `/traces` explorer searches spans: `GET /api/traces/explore/spans` returns matching spans and `GET /api/traces/explore/overview` returns span charts, operations and filter choices (both in `services/trace-explore.service.ts`). `GET /api/traces/:traceId` retrieves one trace, and `GET /api/services` returns aggregate service-health data from server spans. A trace is also reached from a log carrying its id, or by pasting the id into the log search box.
+- `GET /api/traces/:traceId` is a raw `trace_id:<hex>` search with **no time range**, not Quickwit's Jaeger API — that API forced a `now - lookback_period_hours` window (72h default), making older traces findable but unopenable. Capped at `MAX_TRACE_SPANS`; past the cap the earliest spans are kept (the query sorts by `span_start_timestamp_nanos` ascending) and `truncated` is set.
 - **Trace ids are not authorization.** `/api/traces` is a top-level mount, not nested under an index, so there is no per-index gate: any user or personal key with `logs:read` can read any trace. That matches log search, where the same holds for any index.
 - The span store is not readable as a log index — `assertNotTraceIndex` in `getIndexConfig` 404s it, so log-explorer, histogram, field-values, and export all reject it. `isTraceIndex` on `IndexSummary`/`IndexDetail` is derived from `config.traceIndexId`, not stored.
 - `POST /v1/traces` routes to `config.traceIndexId` for **every** ingest key, whatever log index it was created against — no per-key destination exists. `createApiKey` refuses to anchor a key to the span store (`400 INDEX_IS_TRACE_INDEX`), which would let it write log documents there.
@@ -140,13 +141,21 @@ Required:
 
 Optional:
 
-| Var                           | Purpose                                                        |
-| ----------------------------- | -------------------------------------------------------------- |
-| `BETTER_AUTH_SECRET`          | Override the auto-generated Better Auth signing secret         |
-| `FRONTEND_URL`                | Additional allowed CORS origin for split SPA + API deployments |
-| `PORT`                        | Override the HTTP listen port (default `8282`)                 |
-| `TRACE_INDEX_ID`              | Quickwit index holding spans (default `otel-traces-v0_9`)      |
-| `SEARCH_AUDIT_RETENTION_DAYS` | Search audit retention in days (minimum/default `30`)          |
+| Var                           | Purpose                                                                                                                            |
+| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `BETTER_AUTH_SECRET`          | Override the auto-generated Better Auth signing secret                                                                             |
+| `FRONTEND_URL`                | Additional allowed CORS origin for split SPA + API deployments                                                                     |
+| `PORT`                        | Override the HTTP listen port (default `8282`)                                                                                     |
+| `TRACE_INDEX_ID`              | Quickwit index holding spans (default `otel-traces-v0_9`)                                                                          |
+| `SEARCH_AUDIT_RETENTION_DAYS` | Search audit retention in days (minimum/default `30`)                                                                              |
+| `LOG_LEVEL`                   | pino log level (default `info`)                                                                                                    |
+| `TRUST_PROXY_HOPS`            | Trusted proxies setting `X-Forwarded-For`; rate limits key on the client IP at that depth (default `0`, the TCP peer)              |
+| `RATE_LIMIT_WINDOW_MS`        | Window shared by both rate limiters (default `60000`)                                                                              |
+| `PUBLIC_AUTH_RATE_LIMIT`      | Requests per IP per window on unauthenticated auth routes (default `30`)                                                           |
+| `READ_RATE_LIMIT`             | Requests per actor per window on search, histogram, field values, share resolve, `/api/traces` and `/api/services` (default `300`) |
+| `OIDC_DISCOVERY_TIMEOUT_MS`   | How long an OIDC discovery fetch may take (default `5000`, minimum `100`)                                                          |
+| `OIDC_RETRY_MS`               | Wait before rebuilding auth after an OIDC discovery failure (default `60000`, minimum `100`)                                       |
+| `INGEST_PROXY_TIMEOUT_MS`     | How long an ingest POST waits on Quickwit before answering 503 (default `120000`, minimum `1000`)                                  |
 
 Defaults and examples live in the root `.env.example`.
 

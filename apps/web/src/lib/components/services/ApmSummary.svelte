@@ -1,0 +1,79 @@
+<script lang="ts">
+	import type { ServiceHealthServiceRow, ServiceHealthSummary } from '$lib/api/services';
+	import { formatCount, formatDurationMs, formatPercent, formatRate } from '$lib/utils/format';
+
+	type Props = {
+		service: string | null;
+		services: ServiceHealthServiceRow[];
+		summary: ServiceHealthSummary;
+		xRange: [number, number];
+	};
+
+	let { service, services, summary, xRange }: Props = $props();
+
+	const rangeMinutes = $derived(Math.max((xRange[1] - xRange[0]) / 60, 1 / 60));
+	const requestRate = $derived(summary.requests / rangeMinutes);
+	const errorRate = $derived(summary.requests === 0 ? 0 : summary.errors / summary.requests);
+	const slowestService = $derived(
+		services.reduce<ServiceHealthServiceRow | null>((slowest, candidate) => {
+			if (candidate.p95 === null) return slowest;
+			return slowest === null || (slowest.p95 ?? 0) < candidate.p95 ? candidate : slowest;
+		}, null)
+	);
+	const latency = $derived(service === null ? slowestService?.p95 : summary.p95);
+	const latencyContext = $derived(
+		service === null
+			? slowestService?.name
+			: summary.p50 === null
+				? 'p50 unavailable'
+				: `p50 ${formatDurationMs(summary.p50)}`
+	);
+</script>
+
+<section class="border-line rounded-box grid grid-cols-5 border" aria-label="Performance summary">
+	<div class="px-4 py-2.5">
+		<p class="section-label">Error spans</p>
+		<p
+			class:text-warning-ink={summary.errorSpans > 0}
+			class="mt-0.5 text-xl tracking-tight tabular-nums"
+		>
+			{formatCount(summary.errorSpans)}
+		</p>
+	</div>
+
+	<div class="border-line col-span-4 grid grid-cols-4">
+		<div class="border-line border-l px-4 py-2.5">
+			<p class="section-label">Requests</p>
+			<p class="mt-0.5 text-xl tracking-tight tabular-nums">{formatCount(summary.requests)}</p>
+		</div>
+		<div class="border-line border-l px-4 py-2.5">
+			<p class="section-label">Throughput</p>
+			<p class="mt-0.5 text-xl tracking-tight tabular-nums">
+				{formatRate(requestRate)}<span class="text-muted ml-0.5 text-xs">/min</span>
+			</p>
+		</div>
+		<div class="border-line border-l px-4 py-2.5">
+			<p class="section-label">Error rate</p>
+			<p class:text-error={summary.errors > 0} class="mt-0.5 text-xl tracking-tight tabular-nums">
+				{formatPercent(errorRate)}
+			</p>
+		</div>
+		<div class="border-line border-l px-4 py-2.5">
+			<p class="section-label">
+				{service === null ? 'Slowest p95' : 'p95 latency'}
+			</p>
+			<div class="flex min-w-0 items-baseline gap-2">
+				<p class="mt-0.5 shrink-0 text-xl tracking-tight tabular-nums">
+					{formatDurationMs(latency)}
+				</p>
+				<p
+					class="text-subtle truncate text-xs"
+					class:font-mono={service === null}
+					title={latencyContext ?? undefined}
+				>
+					{latencyContext}
+				</p>
+			</div>
+		</div>
+	</div>
+</section>

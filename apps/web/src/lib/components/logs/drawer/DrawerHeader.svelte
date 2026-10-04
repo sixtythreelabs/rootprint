@@ -1,0 +1,111 @@
+<script lang="ts">
+	import type { Snippet } from 'svelte';
+	import { Share2, X } from 'lucide-svelte';
+
+	import CopyButton from '$lib/components/ui/CopyButton.svelte';
+	import { levelColor } from '$lib/constants/level-colors';
+	import { formatTimestamp } from '$lib/utils/time';
+	import type { LogHit } from '$lib/types';
+
+	export type DrawerTab = 'parameters' | 'traceback' | 'trace' | 'json' | 'context';
+
+	let {
+		hit,
+		activeTab,
+		hasTraceback = false,
+		hasTrace = false,
+		meta,
+		onTabChange,
+		onShare,
+		onClose
+	}: {
+		hit: LogHit;
+		activeTab: DrawerTab;
+		hasTraceback?: boolean;
+		hasTrace?: boolean;
+		meta?: Snippet;
+		onTabChange: (tab: DrawerTab) => void;
+		onShare: () => Promise<string | undefined>;
+		onClose: () => void;
+	} = $props();
+
+	type TabDef = { id: DrawerTab; label: string };
+	const TABS = $derived<TabDef[]>([
+		{ id: 'parameters' as DrawerTab, label: 'Parameters' },
+		...(hasTraceback ? [{ id: 'traceback' as DrawerTab, label: 'Traceback' }] : []),
+		...(hasTrace ? [{ id: 'trace' as DrawerTab, label: 'Trace' }] : []),
+		{ id: 'json' as DrawerTab, label: 'JSON' },
+		{ id: 'context' as DrawerTab, label: 'Context' }
+	]);
+
+	const levelLabel = $derived(hit.level.toUpperCase() || 'UNKNOWN');
+	const levelHex = $derived(levelColor(hit.level));
+</script>
+
+<header class="border-line border-b">
+	<div class="px-4 pt-3 pb-2.5">
+		<div class="flex items-center justify-between gap-3">
+			<p id="log-detail-title" class="section-label">Log event</p>
+			<div class="flex items-center gap-1">
+				<CopyButton
+					text={onShare}
+					icon={Share2}
+					class="btn btn-ghost btn-xs btn-square"
+					aria-label="Copy share link"
+					title="Copy share link"
+				/>
+				<button
+					type="button"
+					class="btn btn-ghost btn-xs btn-square"
+					aria-label="Close log details"
+					title="Close (Esc)"
+					onclick={onClose}
+				>
+					<X class="size-3" aria-hidden="true" />
+				</button>
+			</div>
+		</div>
+
+		<div class="mt-2 flex flex-wrap items-center gap-2 text-xs">
+			<span
+				class="border-line bg-base-200/60 text-base-content inline-flex h-7 items-center gap-1.5 rounded border px-2 font-mono"
+			>
+				<span class="status shrink-0" style="background-color: {levelHex};" aria-hidden="true"
+				></span>
+				{levelLabel}
+			</span>
+			<time
+				class="border-line bg-base-200/60 text-muted inline-flex h-7 items-center rounded border px-2 font-mono"
+				datetime={hit.timestamp}
+			>
+				{formatTimestamp(hit.timestamp)}
+			</time>
+			{@render meta?.()}
+		</div>
+	</div>
+
+	<div
+		class="border-line flex min-w-0 overflow-x-auto border-t px-3"
+		role="tablist"
+		aria-label="Log detail tabs"
+	>
+		{#each TABS as tab (tab.id)}
+			<button
+				type="button"
+				role="tab"
+				id={`drawer-tab-${tab.id}`}
+				aria-selected={activeTab === tab.id}
+				aria-controls={`drawer-panel-${tab.id}`}
+				class={[
+					'tab-underline shrink-0 px-4 py-3 text-xs whitespace-nowrap transition-colors',
+					activeTab === tab.id
+						? 'text-base-content font-medium'
+						: 'text-subtle hover:text-base-content'
+				]}
+				onclick={() => onTabChange(tab.id)}
+			>
+				{tab.label}
+			</button>
+		{/each}
+	</div>
+</header>

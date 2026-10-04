@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { ChevronsUpDown, LogOut } from 'lucide-svelte';
+	import { ChevronsUpDown, LogOut, UserRound } from 'lucide-svelte';
 	import { toast } from 'svelte-sonner';
 	import { goto, invalidate } from '$app/navigation';
 	import { authClient } from '$lib/auth-client';
@@ -14,6 +14,7 @@
 	const color = $derived(avatarColor(user.id));
 
 	const dd = $props.id();
+	let panelEl = $state<HTMLDivElement | null>(null);
 
 	let signingOut = $state(false);
 
@@ -51,28 +52,37 @@
 			<span class="block truncate text-sm">{user.name ?? 'User'}</span>
 			<span class="text-subtle block truncate text-xs">{user.email}</span>
 		</span>
-		<ChevronsUpDown class="text-base-content/40 h-3.5 w-3.5 shrink-0" />
+		<ChevronsUpDown class="text-subtle size-3.5 shrink-0" aria-hidden="true" />
 	{/if}
 </button>
 
 <div
+	bind:this={panelEl}
 	popover
 	id={dd}
 	style="position-anchor:--{dd}"
-	class="dropdown dropdown-right dropdown-end border-line rounded-box bg-base-100 ml-2 w-64 border p-0"
+	class="dropdown dropdown-right dropdown-end border-line rounded-box bg-base-100 ml-2 w-64 border p-0 shadow-lg"
 >
 	<div class="border-line border-b px-4 py-3">
 		<p class="text-sm">{user.name ?? 'User'}</p>
-		<p class="text-base-content/60 mt-0.5 font-mono text-xs">{user.email}</p>
+		<p class="text-muted mt-0.5 font-mono text-xs">{user.email}</p>
 	</div>
 	<div class="p-2">
+		<a
+			href="/profile"
+			class="btn btn-ghost btn-sm w-full justify-start"
+			onclick={() => panelEl?.togglePopover(false)}
+		>
+			<UserRound class="text-muted size-3.5" aria-hidden="true" />
+			Profile
+		</a>
 		<button
 			type="button"
 			class="btn btn-ghost btn-sm w-full justify-start"
 			onclick={signOut}
 			disabled={signingOut}
 		>
-			<LogOut class="h-3.5 w-3.5 opacity-70" />
+			<LogOut class="text-muted size-3.5" aria-hidden="true" />
 			{signingOut ? 'Signing out…' : 'Sign out'}
 		</button>
 	</div>

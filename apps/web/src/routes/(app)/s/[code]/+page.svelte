@@ -26,7 +26,7 @@
 			sortDirection: 'desc',
 			filters
 		});
-		void goto(`/?${params.toString()}`, {
+		void goto(`/logs?${params.toString()}`, {
 			replaceState: true,
 			state: { openHit: hit }
 		});
@@ -36,7 +36,7 @@
 {#if data.error}
 	<div class="flex h-full items-center justify-center p-6">
 		<div class="alert alert-warning max-w-md">
-			<CircleX class="h-4 w-4 shrink-0" />
+			<CircleX class="size-3.5 shrink-0" aria-hidden="true" />
 			<div class="flex flex-col gap-2">
 				<span class="text-xs">{message}</span>
 				<a href="/" class="link link-primary text-xs">← Back to logs</a>

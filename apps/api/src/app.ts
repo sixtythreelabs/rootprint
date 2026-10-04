@@ -10,14 +10,14 @@ import { requestId as requestIdMiddleware } from 'hono/request-id';
 import { secureHeaders } from 'hono/secure-headers';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { QuickwitError } from 'quickwit-js';
+import { QuickwitError } from '@rootprint-io/quickwit-js';
 
 import { config } from './config.js';
 import type { AppEnv, AuthedEnv } from './env.js';
 import { initAuth } from './lib/auth.js';
 import { connectDb, db, runMigrations } from './lib/db.js';
 import { logger } from './lib/logger.js';
-import { probeQuickwit, quickwit } from './lib/quickwit.js';
+import { probeQuickwit, quickwit } from './lib/quickwit/client.js';
 import { isApiPath, requestLogging } from './middleware/request-logging.js';
 import { requireUser } from './middleware/require-user.js';
 import { adminActivityRouter } from './routes/admin/activity.js';
@@ -31,13 +31,13 @@ import { otlpRouter } from './routes/ingest/otlp.js';
 import { settingsRouter } from './routes/settings.js';
 import { sharesRouter } from './routes/shares.js';
 import { apiKeysRouter } from './routes/api-keys.js';
-import { monitoringRouter } from './routes/monitoring.js';
+import { servicesRouter } from './routes/services.js';
 import { tracesRouter } from './routes/traces.js';
 import { usersRouter } from './routes/users.js';
 import { serviceAccountsRouter } from './routes/service-accounts.js';
 import type { ApiErrorBody } from './types.js';
 import { HttpError } from './utils/http-error.js';
-import { quickwitErrorToHttp } from './utils/quickwit-error.js';
+import { quickwitErrorToHttp } from './lib/quickwit/errors.js';
 import { Code, otlpError, otlpErrorFromHttpError } from './utils/otlp-response.js';
 import { getBetterAuthSecret } from './lib/secret.js';
 import { startStatsCollector } from './services/index-stats.service.js';
@@ -161,7 +161,7 @@ export const routes = app
 	.route('/api/auth', authRouter)
 	.route('/api/indexes', indexesRouter)
 	.route('/api/traces', tracesRouter)
-	.route('/api/monitoring', monitoringRouter)
+	.route('/api/services', servicesRouter)
 	.route('/api/admin/metrics', withAuth(metricsRouter))
 	.route('/api/admin/cluster', withAuth(clusterRouter))
 	.route('/api/admin/activity', withAuth(adminActivityRouter))
